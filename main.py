@@ -1,27 +1,22 @@
 #!/usr/bin/env pybricks-micropython
-from pybricks.hubs import EV3Brick
 from pybricks import ev3brick as brick
 from pybricks.ev3devices import Motor, TouchSensor, ColorSensor, InfraredSensor, UltrasonicSensor, GyroSensor
-from pybricks.parameters import Port, Stop, Direction, Button, Color, Align
-from pybricks.tools import wait, StopWatch, DataLog, print
+from pybricks.parameters import Port, Stop, Direction, Button, Color, SoundFile, ImageFile, Align
+from pybricks.tools import print, wait, StopWatch
 from pybricks.robotics import DriveBase
-from pybricks.media.ev3dev import SoundFile, ImageFile
-from umqtt.simple import MQTTClient
-
+from umqtt.robust import MQTTClient
 import time
 import os
 import config
 
-ev3 = EV3Brick()
-motor = Motor(Port.B)
+# https://testclient-cloud.mqtt.cool/
 
-ev3.speaker.beep()
-brick.display.text('MQTT Client')
+motor = Motor(Port.A)
 
-MQTT_ClientID = 'EV3'
+MQTT_ClientID = 'ev3test'
 
-MQTT_Topic_Status = 'ev3/Status'
-MQTT_Topic_Motor = 'ev3/Motor'
+MQTT_Topic_Status = 'ev3/status'
+MQTT_Topic_Motor = 'ev3/motor'
 
 def getmessages(topic, msg):
     if topic == MQTT_Topic_Status.encode():
@@ -32,15 +27,15 @@ def getmessages(topic, msg):
 
 motor.reset_angle(0)
 
-mqttc = MQTTClient(MQTT_ClientID, config.MQTT_BROKER, keepalive=60)
-mqttc.connect()
+client = MQTTClient(MQTT_ClientID, config.MQTT_BROKER)
+client.connect()
 
-mqttc.publish(MQTT_Topic_Status, MQTT_ClientID + ' Started')
-mqttc.set_callback(getmessages)
-mqttc.subscribe(MQTT_Topic_Status)
-mqttc.subscribe(MQTT_Topic_Motor)
-mqttc.publish(MQTT_Topic_Status, MQTT_ClientID + ' Listening')
+client.publish(MQTT_Topic_Status, MQTT_ClientID + ' Started')
+client.set_callback(getmessages)
+client.subscribe(MQTT_Topic_Status)
+client.subscribe(MQTT_Topic_Motor)
+client.publish(MQTT_Topic_Status, MQTT_ClientID + ' Listening')
 
 while True:
-    mqttc.check_msg()
+    client.check_msg()
     time.sleep(0.1)
