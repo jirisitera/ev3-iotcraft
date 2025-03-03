@@ -19,14 +19,17 @@ client = MQTTClient(CLIENT_ID, config.MQTT_BROKER, config.MQTT_PORT, config.MQTT
 client.connect()
 
 def callback(topic, msg):
-    message = msg.decode()
-    if topic == MAIN_TOPIC.encode() && isdigit(message):
-        brick.display.text(str(message))
-        robot.straight(-int(message))
+  message = msg.decode()
+  if topic == MAIN_TOPIC.encode():
+    if message == 'stop':
+      robot.stop()
+    elif message.lstrip('-').isdigit():
+      brick.display.text(str(message))
+      robot.drive(-int(message), 0)
 
 client.set_callback(callback)
 client.subscribe(MAIN_TOPIC)
 
 while True:
-    client.check_msg()
-    time.sleep(0.1)
+  client.check_msg()
+  time.sleep(0.1)
