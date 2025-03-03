@@ -8,15 +8,14 @@ import time
 import config
 
 # generate random client id
-pool = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890'
-CLIENT_ID = 'ev3_' + ''.join(urandom.choice(pool) for _ in range(6))
+CLIENT_ID = 'ev3_' + ''.join(urandom.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890') for _ in range(6))
 
 # define topics here
 MAIN_TOPIC = 'ev3/motor'
 motor = Motor(Port.A)
 
 # connect to the mqtt server
-client = MQTTClient(CLIENT_ID, config.MQTT_BROKER)
+client = MQTTClient(CLIENT_ID, config.MQTT_BROKER, config.MQTT_PORT, config.MQTT_USERNAME, config.MQTT_PASSWORD)
 client.connect()
 
 # use this function to receive messages
@@ -32,9 +31,6 @@ client.set_callback(callback)
 
 # subscribe to topics here
 client.subscribe(MAIN_TOPIC)
-
-# publish a message to the main topic
-client.publish(MAIN_TOPIC, CLIENT_ID + ' connected!')
 
 # main loop to check for incoming messages
 while True:
