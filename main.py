@@ -6,7 +6,6 @@ from umqtt.robust import MQTTClient
 import config
 import os
 import time
-import urandom
 # define sensor types
 class SensorType():
   ULTRASONIC = 'lego-ev3-us'
@@ -35,40 +34,38 @@ def toPort(p):
 # discovery service for motors
 def createMotorList():
   motors = []
-  dirs = os.listdir(MOTOR_DIR)
-  for dir in dirs:
-    f = open(MOTOR_DIR + '/' + dir + '/' + PORT_FILE)
-    portName = f.readline()[-2:-1]
-    port = toPort(portName)
-    CLIENT.subscribe(MAIN_TOPIC + '/' + portName)
-    motors.append((portName, Motor(port)))
-    ev3brick.display.text("Motor (port " + portName + ")")
+  for dir in os.listdir(MOTOR_DIR):
+    portName = open(MOTOR_DIR + '/' + dir + '/address').readline()[-2:-1]
+    CLIENT.subscribe(MAIN_TOPIC + portName)
+    motors.append((portName, Motor(toPort(portName))))
+    ev3brick.display.text("Tacho-motor (" + portName + ")")
   return motors
 # discovery service for sensors
 def createSensorList():
   sensors = []
-  dirs = os.listdir(SENSOR_DIR)
-  for dir in dirs:
-    f = open(SENSOR_DIR + '/' + dir + '/' + TYPE_FILE)
-    sType = f.readline().rstrip()
-    f = open(SENSOR_DIR + '/' + dir + '/' + PORT_FILE)
-    portName = f.readline()[-2:-1]
+  for dir in os.listdir(SENSOR_DIR):
+    sensorType = open(SENSOR_DIR + '/' + dir + '/driver_name').readline().rstrip()
+    portName = open(SENSOR_DIR + '/' + dir + '/address').readline()[-2:-1]
     port = toPort(portName)
-    if sType == SensorType.COLOR:
-      sensors.append((SensorType.COLOR, portName, ColorSensor(port)))
-      ev3brick.display.text("Color sensor (port " + portName + ")")
-    elif sType == SensorType.GYRO:
-      sensors.append((SensorType.GYRO, portName, GyroSensor(port)))
-      ev3brick.display.text("Gyro sensor (port " + portName + ")")
-    elif sType == SensorType.INFRARED:
-      sensors.append((SensorType.INFRARED, portName, InfraredSensor(port)))
-      ev3brick.display.text("Infrared sensor (port " + portName + ")")
-    elif sType == SensorType.TOUCH:
-      sensors.append((SensorType.TOUCH, portName, TouchSensor(port)))
-      ev3brick.display.text("Touch sensor (port " + portName + ")")
-    elif sType == SensorType.ULTRASONIC:
-      sensors.append((SensorType.ULTRASONIC, portName, UltrasonicSensor(port)))
-      ev3brick.display.text("Ultrasonic sensor (port " + portName + ")")
+    if sensorType == SensorType.COLOR:
+      sensorName = 'Color'
+      sensorObject = ColorSensor(port)
+    elif sensorType == SensorType.GYRO:
+      sensorName = 'Gyro'
+      sensorObject = GyroSensor(port)
+    elif sensorType == SensorType.INFRARED:
+      sensorName = 'IR'
+      sensorObject = InfraredSensor(port)
+    elif sensorType == SensorType.TOUCH:
+      sensorName = 'Touch'
+      sensorObject = TouchSensor(port)
+    elif sensorType == SensorType.ULTRASONIC:
+      sensorName = 'Ultrasonic'
+      sensorObject = UltrasonicSensor(port)
+    else:
+      continue
+    sensors.append((sensorType, portName, sensorObject))
+    ev3brick.display.text(sensorName + " sensor (" + portName + ")")
   return sensors
 # callback for mqtt messages
 def callback(topic, msg):
@@ -84,19 +81,17 @@ def callback(topic, msg):
       elif message.lstrip('-').isdigit():
         motor[1].run(int(message))
 # define constants
-PREFIX = 'ev3'
-CLIENT_ID = PREFIX + '_' + ''.join(urandom.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890') for _ in range(6))
-UUID = '1234'
-MAIN_TOPIC = PREFIX + '/' + UUID
+MAIN_TOPIC = 'ev3/' + config.UUID + '/'
 MOTOR_DIR = '/sys/class/tacho-motor'
 SENSOR_DIR = '/sys/class/lego-sensor'
-TYPE_FILE = 'driver_name'
-PORT_FILE = 'address'
 SENSOR_TIMER = 0
+ev3brick.display.text("Booting up...")
+ev3brick.display.text("My UUID is [" + config.UUID + "]")
 # register mqtt client
-CLIENT = MQTTClient(CLIENT_ID, config.MQTT_BROKER, config.MQTT_PORT, config.MQTT_USERNAME, config.MQTT_PASSWORD)
+CLIENT = MQTTClient("", config.MQTT_BROKER, config.MQTT_PORT)
 CLIENT.connect()
 CLIENT.set_callback(callback)
+ev3brick.display.text("Connected to MQTT!")
 # register motors and sensors
 MOTORS = createMotorList()
 SENSORS = createSensorList()
@@ -110,18 +105,23 @@ while True:
     if SENSOR_TIMER >= 50:
       for sensor in SENSORS:
         sensorType = sensor[0]
-        sensorPort = sensor[1]
         sensorObject = sensor[2]
+        value = ""
         if sensorType == SensorType.COLOR:
-          CLIENT.publish(MAIN_TOPIC + '/' + sensorPort, str(sensorObject.color()))
+          baseValue = sensorObject.color()
+          if baseValue == None:
+            value = "Color not certain enough"
+          else:
+            value = "Color detected: " + str(baseValue)[6:]
         elif sensorType == SensorType.GYRO:
-          CLIENT.publish(MAIN_TOPIC + '/' + sensorPort, str(sensorObject.angle()))
+          value = "Gyro angle: " + str(sensorObject.angle()) + " degrees"
         elif sensorType == SensorType.INFRARED:
-          CLIENT.publish(MAIN_TOPIC + '/' + sensorPort, str(sensorObject.distance()))
+          value = "IR distance: " + str(sensorObject.distance()) + "%"
         elif sensorType == SensorType.TOUCH:
-          CLIENT.publish(MAIN_TOPIC + '/' + sensorPort, str(sensorObject.pressed()))
+          value = "Button pressed!" if sensorObject.pressed() else "Button not pressed!"
         elif sensorType == SensorType.ULTRASONIC:
-          CLIENT.publish(MAIN_TOPIC + '/' + sensorPort, str(sensorObject.distance()))
+          value = "Sonic distance: " + str(sensorObject.distance()) + " mm"
+        CLIENT.publish(MAIN_TOPIC + sensor[1], value)
       SENSOR_TIMER = 0
   # wait for next loop cycle
   time.sleep(0.1)
