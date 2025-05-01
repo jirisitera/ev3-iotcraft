@@ -90,23 +90,19 @@ MOTOR_PATH = '/sys/class/tacho-motor'
 SENSOR_PATH = '/sys/class/lego-sensor'
 SENSOR_TIMER = 0
 display.text('[IoTcraft]')
-display.text('')
-display.text('Booting up...')
-display.text('')
+display.text('Booting up')
 display.text('My UUID is ' + config.UUID)
 # connect to mqtt broker and subscribe to topics
 CLIENT = MQTTClient('', config.MQTT_BROKER, config.MQTT_PORT, config.MQTT_USERNAME, config.MQTT_PASSWORD)
 CLIENT.connect()
 CLIENT.set_callback(callback)
-display.text('')
 display.text('Connected to MQTT')
 # discover motors and sensors
+display.text('Discovering parts')
 MOTORS = discoverMotors()
 SENSORS = discoverSensors()
 # main loop
-display.text('')
 display.text('Waiting for changes')
-display.text('')
 while True:
   # receive messages
   CLIENT.check_msg()
